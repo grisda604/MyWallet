@@ -28,6 +28,13 @@ func SetupRoutes(app *fiber.App) {
 	api.Put("/categories/:id", handlers.UpdateCategory)
 	api.Delete("/categories/:id", handlers.DeleteCategory)
 
+	// --- Savings Goal Routes ---
+	api.Get("/savings-goals", handlers.GetSavingGoals)
+	api.Get("/savings-goals/:id", handlers.GetSavingGoalByID)
+	api.Post("/savings-goals", handlers.CreateSavingGoal)
+	api.Put("/savings-goals/:id", handlers.UpdateSavingGoal)
+	api.Delete("/savings-goals/:id", handlers.DeleteSavingGoal)
+
 	api.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "message": "Server is running"})
 	})

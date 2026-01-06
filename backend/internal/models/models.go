@@ -58,5 +58,8 @@ type SavingsGoal struct {
 	CurrentAmount float64    `json:"current_amount" gorm:"default:0"`
 	Color         string     `json:"color"`
 	Icon          string     `json:"icon"`
-	Deadline      *time.Time `json:"deadline"` // วันที่ครบกำหนด (Optional)
+	StartDate     *time.Time `json:"start_date"`
+	Deadline      *time.Time `json:"deadline"`
+	Note          string     `json:"note"`
+	Status        string     `json:"status"`
 }
