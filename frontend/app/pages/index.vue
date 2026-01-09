@@ -35,6 +35,7 @@
         </div>
       </div>
       <button
+        @click="openWalletModal"
         class="border-2 border-dashed border-gray-300 rounded-xl p-6 flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition"
       >
         + Add New Wallet
@@ -42,113 +43,44 @@
     </div>
 
     <!-- Transactions Section -->
-    <h2 class="text-2xl font-bold mt-10 mb-4">📝 Recent Transactions</h2>
-
-    <div v-if="transactionsPending" class="text-gray-500">
-      Loading transactions...
-    </div>
-
-    <div v-else-if="transactionsError" class="text-red-500">
-      Error loading transactions: {{ transactionsError.message }}
-    </div>
-
-    <div
-      v-else-if="!transactions || transactions.length === 0"
-      class="text-gray-500"
-    >
-      No transactions yet. Start adding some!
-    </div>
-
-    <div
-      v-else
-      class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-    >
-      <div
-        v-for="transaction in transactions"
-        :key="transaction.ID"
-        class="flex items-center justify-between p-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition"
+    <div class="flex items-center justify-between mt-10 mb-4 space-x-4">
+      <h2 class="text-lg font-bold">📝 Recent Transactions</h2>
+      <button
+        @click="openTransactionModal"
+        class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
       >
-        <!-- ซ้าย: Icon + ข้อมูล -->
-        <div class="flex items-center gap-4 flex-1">
-          <!-- Icon based on type -->
-          <div
-            class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-            :class="{
-              'bg-green-100': transaction.type === 'income',
-              'bg-red-100': transaction.type === 'expense',
-              'bg-blue-100': transaction.type === 'transfer',
-            }"
-          >
-            <span v-if="transaction.type === 'income'">💵</span>
-            <span v-else-if="transaction.type === 'expense'">💸</span>
-            <span v-else>🔄</span>
-          </div>
-          <!-- ข้อมูล Transaction -->
-          <div class="flex-1 min-w-0">
-            <!-- บรรทัดแรก: ชื่อ + Category Badge -->
-            <div class="flex items-center gap-2 mb-1">
-              <span class="font-medium text-gray-800">
-                {{
-                  transaction.note ||
-                  transaction.category?.name ||
-                  "No description"
-                }}
-              </span>
-
-              <!-- Category Badge -->
-              <span
-                v-if="transaction.category"
-                class="text-xs px-2 py-0.5 rounded-full border flex-shrink-0"
-                :style="{
-                  backgroundColor: transaction.category.color + '20',
-                  borderColor: transaction.category.color,
-                  color: transaction.category.color,
-                }"
-              >
-                {{ transaction.category.icon }} {{ transaction.category.name }}
-              </span>
-            </div>
-            <!-- บรรทัดสอง: Wallet info -->
-            <div class="text-sm text-gray-500">
-              {{ transaction.wallet?.name || "Unknown Wallet" }}
-              <span
-                v-if="
-                  transaction.type === 'transfer' && transaction.target_wallet
-                "
-              >
-                → {{ transaction.target_wallet.name }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <!-- ขวา: ยอดเงิน + วันที่ -->
-        <div class="text-right flex-shrink-0 ml-4">
-          <div
-            class="font-semibold"
-            :class="{
-              'text-green-600': transaction.type === 'income',
-              'text-red-500': transaction.type === 'expense',
-              'text-blue-600': transaction.type === 'transfer',
-            }"
-          >
-            <span v-if="transaction.type === 'income'">+</span>
-            <span v-else-if="transaction.type === 'expense'">-</span>
-            ฿{{ Math.abs(transaction.amount).toLocaleString() }}
-          </div>
-          <div class="text-xs text-gray-400">
-            {{
-              new Date(
-                transaction.date || transaction.CreatedAt
-              ).toLocaleDateString("th-TH")
-            }}
-          </div>
-        </div>
-      </div>
+        <span class="text-xl">+</span>
+        <span>เพิ่ม Transaction</span>
+      </button>
     </div>
+
+    <!-- ใช้ TransactionList Component -->
+    <TransactionList
+      :transactions="transactions"
+      :loading="transactionsPending"
+      :error="transactionsError"
+    />
+
+    <!-- ใช้ TransactionModal Component -->
+    <TransactionModal
+      v-model="isTransactionModalOpen"
+      :wallets="wallets || []"
+      :categories="categories || []"
+      @transaction-created="handleTransactionCreated"
+    />
+
+    <!-- ใช้ WalletModal Component -->
+    <WalletModal
+      v-model="isWalletModalOpen"
+      @wallet-created="handleWalletCreated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import TransactionList from "~/components/transactions/TransactionList.vue";
+import TransactionModal from "~/components/transactions/TransactionModal.vue";
+import WalletModal from "~/components/wallets/WalletModal.vue";
 import type { Wallet, Transaction, Category } from "~/types";
 
 // Response type for transactions API
@@ -176,6 +108,33 @@ const {
   pending: categoriesPending,
   error: categoriesError,
 } = await useFetch<Category[]>("http://localhost:8081/api/categories");
+
 // Extract transactions array from response
 const transactions = computed(() => transactionsData.value?.transactions || []);
+
+// Modal states
+const isTransactionModalOpen = ref(false);
+const isWalletModalOpen = ref(false);
+
+// ฟังก์ชันเปิด transaction modal
+const openTransactionModal = () => {
+  isTransactionModalOpen.value = true;
+};
+
+// ฟังก์ชันเปิด wallet modal
+const openWalletModal = () => {
+  isWalletModalOpen.value = true;
+};
+
+// ฟังก์ชัน handle เมื่อสร้าง transaction สำเร็จ
+const handleTransactionCreated = async () => {
+  // Refresh ข้อมูล wallets และ transactions
+  await refreshNuxtData();
+};
+
+// ฟังก์ชัน handle เมื่อสร้าง wallet สำเร็จ
+const handleWalletCreated = async () => {
+  // Refresh ข้อมูล wallets
+  await refreshNuxtData();
+};
 </script>
