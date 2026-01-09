@@ -13,7 +13,9 @@
         <div
           class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl"
         >
-          <h3 class="text-xl font-bold text-gray-800">💰 เพิ่ม Wallet</h3>
+          <h3 class="text-xl font-bold text-gray-800">
+            {{ isEditMode ? "✏️ แก้ไข Wallet" : "💰 เพิ่ม Wallet" }}
+          </h3>
           <button
             @click="closeModal"
             class="text-gray-400 hover:text-gray-600 transition"
@@ -171,7 +173,7 @@
               type="submit"
               class="flex-1 px-4 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition"
             >
-              เพิ่ม Wallet
+              {{ isEditMode ? "บันทึก" : "เพิ่ม Wallet" }}
             </button>
           </div>
         </form>
@@ -181,17 +183,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
+import type { Wallet } from "~/types";
 
 // Props
 const props = defineProps<{
   modelValue: boolean; // สำหรับ v-model (เปิด/ปิด modal)
+  wallet?: Wallet | null; // สำหรับ edit mode
 }>();
 
 // Emits
 const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   "wallet-created": [];
+  "wallet-updated": [];
 }>();
 
 // Computed สำหรับ v-model
@@ -199,6 +204,9 @@ const isModalOpen = computed({
   get: () => props.modelValue,
   set: (value) => emit("update:modelValue", value),
 });
+
+// Check if in edit mode
+const isEditMode = computed(() => !!props.wallet);
 
 // Color options
 const colorOptions = [
@@ -224,6 +232,24 @@ const walletForm = ref({
   icon: "💰",
   currency: "THB",
 });
+
+// Watch for wallet prop changes to populate form in edit mode
+watch(
+  () => props.wallet,
+  (newWallet) => {
+    if (newWallet) {
+      walletForm.value = {
+        name: newWallet.name,
+        type: newWallet.type as "bank" | "cash" | "e-wallet",
+        balance: newWallet.balance,
+        color: newWallet.color || "#3B82F6",
+        icon: newWallet.icon || "💰",
+        currency: newWallet.currency || "THB",
+      };
+    }
+  },
+  { immediate: true }
+);
 
 // ฟังก์ชันปิด modal
 const closeModal = () => {
@@ -252,19 +278,28 @@ const submitWallet = async () => {
       currency: walletForm.value.currency,
     };
 
-    const response = await $fetch("http://localhost:8081/api/wallets", {
-      method: "POST",
-      body: payload,
-    });
-
-    // Emit event เพื่อบอก parent ว่าสร้าง wallet สำเร็จแล้ว
-    emit("wallet-created");
-
-    closeModal();
-    alert("เพิ่ม Wallet สำเร็จ!");
+    if (isEditMode.value && props.wallet) {
+      // Update existing wallet
+      await $fetch(`http://localhost:8081/api/wallets/${props.wallet.ID}`, {
+        method: "PUT",
+        body: payload,
+      });
+      emit("wallet-updated");
+      closeModal();
+      alert("อัพเดท Wallet สำเร็จ!");
+    } else {
+      // Create new wallet
+      await $fetch("http://localhost:8081/api/wallets", {
+        method: "POST",
+        body: payload,
+      });
+      emit("wallet-created");
+      closeModal();
+      alert("เพิ่ม Wallet สำเร็จ!");
+    }
   } catch (error) {
-    console.error("Error adding wallet:", error);
-    alert("เกิดข้อผิดพลาดในการเพิ่ม Wallet");
+    console.error("Error saving wallet:", error);
+    alert("เกิดข้อผิดพลาดในการบันทึก Wallet");
   }
 };
 </script>
